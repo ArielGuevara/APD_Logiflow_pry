@@ -1,0 +1,144 @@
+# ==================== MAVEN ====================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ==================== GRADLE ====================
+.gradle/
+build/
+!gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ==================== SPRING BOOT ====================
+*.log
+*.log.*
+logs/
+spring-shell.log
+
+# ==================== IDEs ====================
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ==================== JAVA ====================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*
+
+# ==================== SISTEMA OPERATIVO ====================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================== ARCHIVOS TEMPORALES ====================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~.nib
+*.bak
+*.orig
+
+# ==================== BASE DE DATOS ====================
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
+
+# ==================== DOCKER ====================
+#*.env
+#.env.local
+#.env.*.local
+docker-compose.override.yml
+
+# ==================== CONFIGURACIÓN SENSIBLE ====================
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+**/application-secret.yml
+**/application-secret.yaml
+**/application-secret.properties
+application-dev.yml
+application-prod.yml
+secrets.yml
+secrets.properties
+
+# ==================== NODE (si hay frontend) ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log*
+
+# ==================== OTROS ====================
+*.pid
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
+!.mvn/wrapper/maven-wrapper.jar

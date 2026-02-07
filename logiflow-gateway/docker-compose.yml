@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  # ==================== Kong Gateway (DB-less Mode) ====================
+  kong:
+    image: kong:3.5
+    container_name: kong-gateway
+    environment:
+      # Desactivamos la base de datos para usar el modo declarativo
+      KONG_DATABASE: "off"
+      # Indicamos dónde leerá la configuración
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      # Logs para ver qué pasa en la consola
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      # Configuración de escuchas
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      # Mapeamos tu archivo local al contenedor
+      - ./kong.yml:/kong/declarative/kong.yml:ro
+    ports:
+      - "8000:8000"   # Puerto principal para consumir tus APIs
+      - "8001:8001"   # Admin API (solo lectura en modo DB-less)
+    extra_hosts:
+      # CRUCIAL: Esto permite a Kong (dentro de Docker) ver tus microservicios (fuera de Docker)
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
