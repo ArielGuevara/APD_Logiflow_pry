@@ -1,6 +1,7 @@
 package com.logiflow.pedidoservice_core.service.impl;
 
 import com.logiflow.pedidoservice_core.dto.mapper.PedidoMapper;
+import com.logiflow.pedidoservice_core.dto.messaging.NotificationEventDto;
 import com.logiflow.pedidoservice_core.dto.request.PedidoRequestDto;
 import com.logiflow.pedidoservice_core.dto.response.PedidoResponseDto;
 import com.logiflow.pedidoservice_core.exception.ResourceNotFoundException;
@@ -9,12 +10,14 @@ import com.logiflow.pedidoservice_core.model.enums.EstadoPedido;
 import com.logiflow.pedidoservice_core.model.enums.TipoVehiculo;
 import com.logiflow.pedidoservice_core.repository.PedidoRepository;
 import com.logiflow.pedidoservice_core.service.PedidoService;
+import com.logiflow.pedidoservice_core.service.messaging.NotificationProducer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,6 +27,8 @@ public class PedidoServiceImpl implements PedidoService {
 
     private final PedidoRepository pedidoRepository;
     private final PedidoMapper pedidoMapper;
+    @Autowired
+    private NotificationProducer notificationProducer;
 
     @Override
     @Transactional //  Garantiza ACID. Si falla algo, hace rollback.
@@ -36,6 +41,16 @@ public class PedidoServiceImpl implements PedidoService {
         pedido.setClienteId(clienteId);
 
         Pedido pedidoGuardado = pedidoRepository.save(pedido);
+
+        try {
+            notificationProducer.sendCreate(pedidoGuardado.getId(),
+                    pedidoGuardado.getClienteId().toString(),
+                    pedidoGuardado.getDireccionEntrega(),
+                    pedidoGuardado.getDireccionEntrega());
+        } catch (Exception e) {
+            // Loguear el error pero no interrumpir la creación del pedido
+            System.err.println("Error al enviar notificación: " + e.getMessage());
+        }
 
         return pedidoMapper.toResponse(pedidoGuardado);
     }
@@ -85,13 +100,25 @@ public class PedidoServiceImpl implements PedidoService {
         pedido.setEstado(EstadoPedido.CANCELADO);
         pedido.setActivo(false);
 
-        pedidoRepository.save(pedido);
+        Pedido pedidoGuardado = pedidoRepository.save(pedido);
+
+        try {
+            notificationProducer.sendDelete(pedidoGuardado.getId(),
+                    pedidoGuardado.getClienteId().toString(),
+                    pedidoGuardado.getDireccionEntrega(),
+                    pedidoGuardado.getDireccionEntrega());
+        } catch (Exception e) {
+            // Loguear el error pero no interrumpir la creación del pedido
+            System.err.println("Error al enviar notificación: " + e.getMessage());
+        }
+
+
     }
 
     // --- MÉTODOS PRIVADOS DE VALIDACIÓN ---
 
     private void validarReglasDeNegocio(PedidoRequestDto request) {
-        if (request.getTipoVehiculo() == TipoVehiculo.MOTORIZADO && request.getPesoKg() > 20.0) {
+        if (request.getTipoVehiculo() == TipoVehiculo.MOTO && request.getPesoKg() > 20.0) {
             throw new IllegalArgumentException("El peso excede la capacidad para un Motorizado (Max 20kg)");
         }
 

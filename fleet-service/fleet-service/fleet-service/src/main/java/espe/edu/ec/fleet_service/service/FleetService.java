@@ -1,5 +1,6 @@
 package espe.edu.ec.fleet_service.service;
 
+import espe.edu.ec.fleet_service.dto.NotificationEventDto;
 import espe.edu.ec.fleet_service.model.EstadoVehiculo;
 import espe.edu.ec.fleet_service.model.Repartidor;
 import espe.edu.ec.fleet_service.model.Vehiculo;
@@ -8,7 +9,9 @@ import espe.edu.ec.fleet_service.repository.VehiculoRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -16,10 +19,12 @@ public class FleetService {
 
     private final VehiculoRepository vehiculoRepository;
     private final RepartidorRepository repartidorRepository;
+    private final NotificationProducer notificationProducer;
 
-    public FleetService(VehiculoRepository vehiculoRepository, RepartidorRepository repartidorRepository) {
+    public FleetService(VehiculoRepository vehiculoRepository, RepartidorRepository repartidorRepository, NotificationProducer notificationProducer) {
         this.vehiculoRepository = vehiculoRepository;
         this.repartidorRepository = repartidorRepository;
+        this.notificationProducer = notificationProducer;
     }
 
     //vehiculos
@@ -31,7 +36,23 @@ public class FleetService {
         if (vehiculo.getEstado() == null) {
             vehiculo.setEstado(EstadoVehiculo.DISPONIBLE);
         }
-        return vehiculoRepository.save(vehiculo);
+
+        Vehiculo actualizado = vehiculoRepository.save(vehiculo);
+
+        try {
+            notificationProducer.sendVehiculoCreate(actualizado.getId(),
+                    actualizado.getPlaca(),
+                    actualizado.getColor(),
+                    actualizado.getAnioFabricacion(),
+                    actualizado.getTipoVehiculo().toString(),
+                    actualizado.getMarca());
+        } catch (Exception e) {
+            // Loguear el error pero no interrumpir la creación del pedido
+            System.err.println("Error al enviar notificación: " + e.getMessage());
+        }
+
+
+        return actualizado;
     }
 
     public List<Vehiculo> listarVehiculos() {
@@ -47,7 +68,27 @@ public class FleetService {
     public Vehiculo actualizarEstadoVehiculo(String placa, EstadoVehiculo nuevoEstado) {
         Vehiculo vehiculo = buscarVehiculoPorPlaca(placa);
         vehiculo.setEstado(nuevoEstado);
-        return vehiculoRepository.save(vehiculo);
+
+        Vehiculo actualizado = vehiculoRepository.save(vehiculo);
+
+        String severidad = "INFO";
+        if (nuevoEstado == EstadoVehiculo.MANTENIMIENTO) {
+            severidad = "WARNING"; // Mantenimiento es una alerta
+        }
+
+        try {
+            notificationProducer.sendVehiculoCreate(actualizado.getId(),
+                    actualizado.getPlaca(),
+                    actualizado.getColor(),
+                    actualizado.getAnioFabricacion(),
+                    actualizado.getTipoVehiculo().toString(),
+                    actualizado.getMarca());
+        } catch (Exception e) {
+            // Loguear el error pero no interrumpir la creación del pedido
+            System.err.println("Error al enviar notificación: " + e.getMessage());
+        }
+
+        return actualizado;
     }
 
     //repartidores
@@ -56,7 +97,22 @@ public class FleetService {
         if (repartidorRepository.existsByIdentificacion(repartidor.getIdentificacion())) {
             throw new RuntimeException("El repartidor con esa cedula si existe");
         }
-        return repartidorRepository.save(repartidor);
+
+        Repartidor nuevoRepartidor = repartidorRepository.save(repartidor);
+
+        try {
+            notificationProducer.sendPersonaCreate(nuevoRepartidor.getId(),
+                    nuevoRepartidor.getIdentificacion(),
+                    nuevoRepartidor.getNombre(),
+                    nuevoRepartidor.getApellido(),
+                    nuevoRepartidor.getTelefono(),
+                    nuevoRepartidor.getLicencia());
+        } catch (Exception e) {
+            // Loguear el error pero no interrumpir la creación del pedido
+            System.err.println("Error al enviar notificación: " + e.getMessage());
+        }
+
+        return nuevoRepartidor;
     }
 
     public List<Repartidor> listarRepartidores() {
