@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logiflow
+---
+# 1. Almacenamiento Persistente (Para guardar colas y mensajes)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: logiflow
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# 2. Deployment (El contenedor de RabbitMQ)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          ports:
+            - containerPort: 5672   # Puerto AMQP (Comunicación entre microservicios)
+            - containerPort: 15672  # Puerto Web (Management UI)
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "admin"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "admin123"
+            - name: RABBITMQ_DEFAULT_VHOST
+              value: "/"
+          
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          
+          # VOLUMEN: Montamos el disco persistente
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+
+          # SALUD: Configuración "paciente" para inicio lento
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 90 # Esperamos 1.5 min antes de matar el pod
+            periodSeconds: 30
+          
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 60 # Esperamos 1 min antes de enviar tráfico
+            periodSeconds: 10
+
+      volumes:
+        - name: rabbitmq-data
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc
+---
+# 3. Service (DNS Interno y Acceso Externo)
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: logiflow
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+      nodePort: 31672 # Acceso desde tu navegador: http://localhost:31672
+  type: NodePort

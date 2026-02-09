@@ -1,0 +1,87 @@
+<<<<<<<<<<<<<<<<<<<CREAR LAS IMAGENES DE CADA MS>>>>>>>>>>>>>>>
+
+docker build -t logiflow-auth-service:latest .
+
+docker build -t billing-service:latest .
+
+docker build -t fleet-service:latest .
+
+docker build -t graphql-service .
+
+docker build -t notificaciones-logiflow-service .
+
+docker build -t pedidos-service .
+
+
+
+<<<<<<<<<<<<<Microservicio de auth>>>>>>>>>>>>>>>.
+
+docker run -d -p 8081:8081 --name auth-service -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/logiflow_auth -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=admin123 logiflow-auth-service:latest
+
+<<<<<<<<<<<<<Microservicio de biling>>>>>>>>>>>>>>>.
+
+docker run -d --name billing-service -p 8084:8084 -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/logiflow_billing -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=admin123 billing-service:latest
+
+
+<<<<<<<<<<<<<Microservicio de fleet>>>>>>>>>>>>>>>.
+
+docker run -d -p 8083:8083 --name fleet-service -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/logiflow_fleet -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=admin123 -e SPRING_RABBITMQ_HOST=host.docker.internal -e SPRING_RABBITMQ_PORT=5672 -e SPRING_RABBITMQ_USERNAME=admin -e SPRING_RABBITMQ_PASSWORD=admin123 fleet-service:latest
+
+<<<<<<<<<<<<<Microservicio de GraphQL>>>>>>>>>>>>>>>.
+
+docker run -d -p 8085:8085 --name graphql-service  -e PORT=8085 -e NODE_ENV=production -e USUARIO_SERVICE_URL=http://usuario-service:3001 -e PEDIDO_SERVICE_URL=http://pedido-service:3002 -e FACTURA_SERVICE_URL=http://factura-service:3003 -e FLEET_SERVICE_URL=http://fleet-service:3004 graphql-service
+
+
+<<<<<<<<<<<<<Microservicio de notificaciones>>>>>>>>>>>>>>>.
+
+docker run -d --name notificaciones-service -p 3001:3001 -e DB_HOST=host.docker.internal -e DB_PORT=5432 -e DB_USER=postgres -e DB_PASSWORD=admin123 -e DB_NAME=logiflow_notificaciones -e RABBITMQ_HOST=host.docker.internal -e RABBITMQ_PORT=5672 -e RABBITMQ_USER=admin -e RABBITMQ_PASSWORD=admin123 -e SERVER_PORT=3001 notificaciones-logiflow-service
+
+
+<<<<<<<<<<<<<Microservicio de pedidos>>>>>>>>>>>>>>>.
+
+docker run -d --name pedidos-service-container -p 8080:8080 -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/logiflow_pedidos -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=admin123 -e SPRING_RABBITMQ_HOST=host.docker.internal -e SPRING_RABBITMQ_PORT=5672 -e SPRING_RABBITMQ_USERNAME=admin -e SPRING_RABBITMQ_PASSWORD=admin123 pedidos-service
+
+
+
+<<<<<<<<<<<<<<<<<TAGS DE LAS IMAGENES>>>>>>>>>>>>>
+
+docker tag logiflow-auth-service adguevara7/logiflow-auth-service:v1.0.0
+
+docker tag billing-service:latest adguevara7/billing-service:v1.0.0
+
+docker tag fleet-service:latest adguevara7/fleet-service:v1.0.0
+
+docker tag graphql-service adguevara7/graphql-service:v1.0.0
+
+docker tag notificaciones-logiflow-service adguevara7/notificaciones-logiflow-service:v1.0.0
+
+docker tag pedidos-service adguevara7/pedidos-service:v1.0.0
+
+
+
+<<<<<<<<<<<<<<<<<<Subir las imagenes a dockerhub>>>>>>>>>>>>>>>>>>>>>>
+
+docker push adguevara7/logiflow-auth-service:v1.0.0
+
+docker push adguevara7/billing-service:v1.0.0
+
+docker push adguevara7/fleet-service:v1.0.0
+
+docker push adguevara7/graphql-service:v1.0.0
+
+docker push adguevara7/notificaciones-logiflow-service:v1.0.0
+
+docker push adguevara7/pedidos-service:v1.0.0
+
+
+
+
+<<<<<<<<<<<<<<<<<<<<Apertura de puertos para cada >>>>>>>>>>>>>>>>>>>>>>>
+
+kubectl port-forward -n guevara svc/ms-clientes 8081:80
+
+kubectl port-forward -n guevara svc/ms-zonas 8082:80
+
+kubectl port-forward -n guevara svc/ms-notification 3001:80
+
+kubectl port-forward -n guevara svc/ms-tickets 4000:80

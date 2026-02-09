@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+    spec:
+      containers:
+        - name: billing-service
+          # Asegúrate de que esta imagen exista localmente o en DockerHub
+          image: adguevara7/billing-service:v1.0.0 
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084 # Puerto específico de Billing
+          
+          # Healthcheck: Vital para que Kong no envíe tráfico si el servicio no está listo
+          readinessProbe:
+            tcpSocket:
+              port: 8084
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          env:
+            # --- CONEXIÓN A BASE DE DATOS (Servicio Interno) ---
+            - name: SPRING_DATASOURCE_URL
+              # Apunta al servicio 'postgres-db' creado en postgres-logiflow.yml
+              value: "jdbc:postgresql://postgres-db:5432/logiflow_billing"
+            
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "admin123"
+
+            # Nota: No agregué variables de RabbitMQ porque tu comando original
+            # no las tenía. Si Billing necesita escuchar eventos, agrégalas igual que en Auth.
+
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+# ==============================================================================
+# SERVICE: Kong usa este nombre DNS interno para enrutar el tráfico
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+  namespace: logiflow
+spec:
+  selector:
+    app: billing-service
+  ports:
+    - protocol: TCP
+      port: 80          # Puerto interno del cluster (Kong apunta aquí)
+      targetPort: 8084  # Puerto del contenedor
+---
+# ==============================================================================
+# INGRESS: Acceso directo opcional al servicio (además del Gateway Kong)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: billing-service-ingress
+  namespace: logiflow
+spec:
+  rules:
+  - host: billing.logiflow.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: billing-service
+            port:
+              number: 80

@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-service
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fleet-service
+  template:
+    metadata:
+      labels:
+        app: fleet-service
+    spec:
+      containers:
+        - name: fleet-service
+          image: adguevara7/fleet-service:v1.0.0  # Asegúrate de tener esta imagen disponible
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083  # Puerto donde escucha tu JAR de Fleet
+          
+          # Healthcheck: Esperamos a que Spring y RabbitMQ conecten
+          readinessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          env:
+            # --- CONEXIÓN A BASE DE DATOS (Servicio Interno) ---
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-db:5432/logiflow_fleet"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "admin123"
+
+            # --- CONEXIÓN A RABBITMQ (Servicio Interno) ---
+            # Aquí ocurre la magia de la comunicación asíncrona
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"   # Nombre del servicio K8s
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+            - name: SPRING_RABBITMQ_USERNAME
+              value: "admin"
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: "admin123"
+            
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+# ==============================================================================
+# SERVICE: Kong busca 'http://fleet-service' en el puerto 80
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-service
+  namespace: logiflow
+spec:
+  selector:
+    app: fleet-service
+  ports:
+    - protocol: TCP
+      port: 80          # Puerto estándar interno
+      targetPort: 8083  # Puerto real de tu aplicación Fleet
+---
+# ==============================================================================
+# INGRESS: Acceso directo opcional al servicio (además del Gateway Kong)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fleet-service-ingress
+  namespace: logiflow
+spec:
+  rules:
+  - host: fleet.logiflow.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: fleet-service
+            port:
+              number: 80

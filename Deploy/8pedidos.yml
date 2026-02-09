@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pedidos-service
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pedidos-service
+  template:
+    metadata:
+      labels:
+        app: pedidos-service
+    spec:
+      containers:
+        - name: pedidos-service
+          image: adguevara7/pedidos-service:v1.0.0 # O tu imagen de DockerHub
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          
+          # Healthcheck
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          env:
+            # --- BASE DE DATOS INTERNA ---
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-db:5432/logiflow_pedidos"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "admin123"
+
+            # --- RABBITMQ INTERNO ---
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+            - name: SPRING_RABBITMQ_USERNAME
+              value: "admin"
+            - name: SPRING_RABBITMQ_PASSWORD
+              value: "admin123"
+              
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pedidos-service
+  namespace: logiflow
+spec:
+  selector:
+    app: pedidos-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# ==============================================================================
+# INGRESS: Acceso directo opcional al servicio (además del Gateway Kong)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pedidos-service-ingress
+  namespace: logiflow
+spec:
+  rules:
+  - host: pedidos.logiflow.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pedidos-service
+            port:
+              number: 80

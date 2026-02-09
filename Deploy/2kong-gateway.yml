@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logiflow
+---
+# ==============================================================================
+# 1. CONFIGMAP: Aquí vive tu configuración declarativa (kong.yml)
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: logiflow
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      # --- AUTH SERVICE ---
+      - name: auth-service
+        # ANTES: http://host.docker.internal:8081
+        # AHORA: http://auth-service (Asumiendo que crearás un Service con este nombre)
+        url: http://auth-service
+        tags: [authentication]
+        routes:
+          - name: auth-routes
+            paths:
+              - /api/v1/auth
+              - /api/v1/usuarios
+            strip_path: false
+            methods: [GET, POST, PUT, PATCH, DELETE]
+
+      # --- PEDIDO SERVICE ---
+      - name: pedido-service
+        # ANTES: http://host.docker.internal:8080
+        # AHORA: http://pedidos-service (Ojo: usa el nombre exacto de tu Service K8s)
+        url: http://pedidos-service
+        tags: [pedidos]
+        routes:
+          - name: pedido-routes
+            paths:
+              - /api/v1/pedidos
+            strip_path: false
+            methods: [GET, POST, PUT, PATCH, DELETE]
+
+      # --- FLEET SERVICE ---
+      - name: fleet-service
+        # ANTES: http://host.docker.internal:8083
+        # AHORA: http://fleet-service
+        url: http://fleet-service
+        tags: [fleet]
+        routes:
+          - name: fleet-routes
+            paths:
+              - /api/v1/fleet
+            strip_path: false
+            methods: [GET, POST, PUT, PATCH, DELETE]
+
+      # --- BILLING SERVICE ---
+      - name: billing-service
+        # ANTES: http://host.docker.internal:8084
+        # AHORA: http://billing-service
+        url: http://billing-service
+        tags: [billing]
+        routes:
+          - name: billing-routes
+            paths:
+              - /api/v1/billing
+            strip_path: false
+            methods: [GET, POST, PUT, PATCH, DELETE]
+
+    # ==================== PLUGINS ====================
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - http://localhost:3000
+            - http://localhost:4200
+            - http://api.logiflow.io  # Agregamos el dominio final
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Accept, Authorization, Content-Type, X-Requested-With, X-User-Id]
+          exposed_headers: [Authorization, Content-Disposition]
+          credentials: true
+          max_age: 3600
+
+      - name: file-log
+        config:
+          path: /dev/stdout
+          reopen: true
+---
+# ==============================================================================
+# 2. DEPLOYMENT: El contenedor de Kong Gateway
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong-gateway
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kong-gateway
+  template:
+    metadata:
+      labels:
+        app: kong-gateway
+    spec:
+      containers:
+        - name: kong
+          image: kong:3.5
+          ports:
+            - containerPort: 8000 # Proxy
+            - containerPort: 8001 # Admin
+          env:
+            # Configuración DB-less igual que en tu docker-compose
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: "/config/kong.yml"
+            - name: KONG_PROXY_ACCESS_LOG
+              value: "/dev/stdout"
+            - name: KONG_ADMIN_ACCESS_LOG
+              value: "/dev/stdout"
+            - name: KONG_PROXY_ERROR_LOG
+              value: "/dev/stderr"
+            - name: KONG_ADMIN_ERROR_LOG
+              value: "/dev/stderr"
+            - name: KONG_ADMIN_LISTEN
+              value: "0.0.0.0:8001"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          # Montamos el ConfigMap
+          volumeMounts:
+            - name: kong-config-vol
+              mountPath: /config
+          # Healthcheck nativo
+          livenessProbe:
+            exec:
+              command: ["kong", "health"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["kong", "health"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: kong-config-vol
+          configMap:
+            name: kong-config
+---
+# ==============================================================================
+# 3. SERVICE: Expone Kong al clúster
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-gateway
+  namespace: logiflow
+spec:
+  selector:
+    app: kong-gateway
+  ports:
+    - name: proxy
+      port: 8000
+      targetPort: 8000
+    - name: admin
+      port: 8001
+      targetPort: 8001
+---
+# ==============================================================================
+# 4. INGRESS: La entrada unificada desde Internet (Host)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: logiflow-ingress
+  namespace: logiflow
+spec:
+  rules:
+  - host: api.logiflow.io  # <--- TU NUEVO DOMINIO PARA ESTE PROYECTO
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kong-gateway
+            port:
+              number: 8000

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  billing-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: billing-service
+    environment:
+      # Configurar según tu base de datos PostgreSQL externa
+      # Opciones:
+      # - host.docker.internal:5432 (si PostgreSQL está en el host)
+      # - nombre-contenedor-postgres:5432 (si PostgreSQL es otro contenedor)
+      # - IP del servidor PostgreSQL
+      SPRING_DATASOURCE_URL: jdbc:postgresql://host.docker.internal:5432/logiflow_billing
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SERVER_PORT: 8084
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
+    networks:
+      - billing-network
+
+networks:
+  billing-network:
+    driver: bridge

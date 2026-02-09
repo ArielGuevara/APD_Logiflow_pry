@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: logiflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          # Asegúrate de tener esta imagen disponible o súbela a DockerHub
+          image: adguevara7/logiflow-auth-service:v1.0.0 
+          imagePullPolicy: IfNotPresent # Usa la imagen local si no la encuentra en DockerHub
+          ports:
+            - containerPort: 8081 # Puerto de Spring Boot
+          
+          # Healthcheck para evitar errores 500 al iniciar
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          env:
+            # --- CONEXIÓN A BASE DE DATOS (Servicio Interno) ---
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-db:5432/logiflow_auth"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "postgres"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "admin123"
+
+            
+            # Perfil de producción (recomendado)
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+# ==============================================================================
+# SERVICE: Este nombre 'auth-service' es el que Kong usa para encontrarte
+# ==============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: logiflow
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - protocol: TCP
+      port: 80          # Puerto interno del cluster (Kong apunta aquí)
+      targetPort: 8081  # Puerto del contenedor
+---
+# ==============================================================================
+# INGRESS: Acceso directo opcional al servicio (además del Gateway Kong)
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth-service-ingress
+  namespace: logiflow
+spec:
+  rules:
+  - host: auth.logiflow.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
+            port:
+              number: 80

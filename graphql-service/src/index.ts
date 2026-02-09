@@ -11,6 +11,7 @@ import { typeDefs } from './typeDefs/schema';
 import { resolvers } from './resolvers';
 import { createDataLoaders } from './utils/dataLoaders';
 import { GraphQLContext } from './utils/context';
+import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -29,7 +30,10 @@ async function startServer() {
     const server = new ApolloServer<GraphQLContext>({
         typeDefs,
         resolvers,
-        plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+        plugins: [
+        ApolloServerPluginDrainHttpServer({ httpServer }),
+        ApolloServerPluginLandingPageLocalDefault({ embed: true })
+    ],
         introspection: process.env.ENABLE_INTROSPECTION !== 'false',
         formatError: (error) => {
             console.error('[GraphQL Error]:', error);
