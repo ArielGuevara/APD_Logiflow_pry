@@ -65,12 +65,16 @@ spec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
             initialDelaySeconds: 90 # Esperamos 1.5 min antes de matar el pod
             periodSeconds: 30
+            timeoutSeconds: 10  # <--- AGREGA ESTO (Antes era 1s por defecto)
+            failureThreshold: 3
           
           readinessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
             initialDelaySeconds: 60 # Esperamos 1 min antes de enviar tráfico
             periodSeconds: 10
+            timeoutSeconds: 10  # <--- AGREGA ESTO TAMBIÉN
+            failureThreshold: 3
 
       volumes:
         - name: rabbitmq-data
